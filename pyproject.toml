@@ -24,10 +24,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/sankalpsingh/mainframe-brain"
-Issues = "https://github.com/sankalpsingh/mainframe-brain/issues"
-Changelog = "https://github.com/sankalpsingh/mainframe-brain/blob/main/CHANGELOG.md"
-Source = "https://github.com/sankalpsingh/mainframe-brain"
+Homepage = "https://github.com/imsankz/mainframe-brain"
+Issues = "https://github.com/imsankz/mainframe-brain/issues"
+Changelog = "https://github.com/imsankz/mainframe-brain/blob/main/CHANGELOG.md"
+Source = "https://github.com/imsankz/mainframe-brain"
 
 [project.optional-dependencies]
 graph = ["kuzu>=0.4"]
