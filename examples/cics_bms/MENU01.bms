@@ -1,0 +1,35 @@
+*---------------------------------------------------------------------*
+* MENU01  -  CICS BMS MAPSET                                          *
+*         -  SAMPLE BANK MAIN MENU AND HELP SCREENS                   *
+*         -  SYNTHETIC PUBLIC-SAFE FIXTURE (NO REAL CUSTOMER DATA)   *
+*---------------------------------------------------------------------*
+         MAP01S  DFHMSD TYPE=&SYSPARM,LANG=COBOL,MODE=INOUT,               X
+                        STORAGE=AUTO,CTRL=FREEKB,TERM=ALL,                X
+                        DSATTR=COLOR
+*---------------------------------------------------------------------*
+*  MAIN MENU MAP                                                      *
+*---------------------------------------------------------------------*
+         MAIN    DFHMDI SIZE=(24,80),LINE=1,COLUMN=1
+         TITLE   DFHMDF POS=(1,28),LENGTH=24,ATTRB=(NORM,PROT),            X
+                        INITIAL='*** MAIN BANK MENU ***'
+         MENU01  DFHMDF POS=(5,10),LENGTH=8,ATTRB=(NORM,PROT),             X
+                        INITIAL='1) ACCT'
+         MENU02  DFHMDF POS=(7,10),LENGTH=8,ATTRB=(NORM,PROT),             X
+                        INITIAL='2) TXNS'
+         MENU03  DFHMDF POS=(9,10),LENGTH=8,ATTRB=(NORM,PROT),             X
+                        INITIAL='3) HELP'
+         SELFLD  DFHMDF POS=(21,10),LENGTH=2,ATTRB=(UNPROT,IC)
+*---------------------------------------------------------------------*
+*  HELP MAP                                                           *
+*---------------------------------------------------------------------*
+         HELP    DFHMDI SIZE=(24,80),LINE=1,COLUMN=1
+         HTITLE  DFHMDF POS=(1,30),LENGTH=20,ATTRB=(NORM,PROT),           X
+                        INITIAL='*** HELP SCREEN ***'
+         HLN1    DFHMDF POS=(5,5),LENGTH=70,ATTRB=(NORM,PROT),            X
+                        INITIAL='SELECT A MENU OPTION BY ENTERING ITS NUMBER'
+         HLN2    DFHMDF POS=(7,5),LENGTH=70,ATTRB=(NORM,PROT),            X
+                        INITIAL='PRESS CLEAR TO RETURN TO THE MAIN MENU'
+         HLN3    DFHMDF POS=(9,5),LENGTH=70,ATTRB=(NORM,PROT),            X
+                        INITIAL='FOR SUPPORT CONTACT THE OPERATIONS DESK'
+*---------------------------------------------------------------------*
+         MAP01S  DFHMSD TYPE=FINAL

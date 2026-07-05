@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Ruff
+        run: ruff check mainframe_brain tests --config pyproject.toml
+      - name: Pytest
+        run: pytest tests/ -q
+      - name: CLI Smoke
+        run: |
+          rm -f /tmp/mb.db
+          python -m mainframe_brain.cli extract examples/cobol --out /tmp/mb.db
+          python -m mainframe_brain.cli list-nodes --store-path /tmp/mb.db
+          python -m mainframe_brain.cli query --store-path /tmp/mb.db "what touches ACCOUNTS"
+          python -m mainframe_brain.cli enrich --store-path /tmp/mb.db --budget 20000 --adapter mock

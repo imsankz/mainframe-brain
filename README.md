@@ -20,12 +20,15 @@ pip install -e ".[dev]"
 ## Quickstart
 
 ```bash
-mainframe-brain extract examples/cobol/        # Layer 1 → graph
-mainframe-brain build-graph  brain.db          # assemble graph (SQLite)
-mainframe-brain triage      brain.db           # Layer 3 → work queue
-mainframe-brain enrich      brain.db --budget 50000   # Layer 4 (needs an LLM adapter)
-mainframe-brain query       brain.db "what touches ACCOUNTS?"
-mainframe-brain explore     brain.db --node Program:default:INTCALC01
+mainframe-brain extract examples/cobol/ --out brain.db   # Layer 1 → graph
+mainframe-brain build-graph --store-path brain.db        # summarize counts
+mainframe-brain triage     --store-path brain.db         # Layer 3 → re-enrichment queue
+mainframe-brain enrich     --store-path brain.db --budget 50000  # Layer 4 (mock adapter)
+mainframe-brain verify     --store-path brain.db <rule-id>       # approve (review workflow)
+mainframe-brain flag       --store-path brain.db --rule <id> --reason "wrong"  # flag-as-wrong
+mainframe-brain edit-rule  --store-path brain.db --rule <id> --rule-text "..."  # edit
+mainframe-brain query      --store-path brain.db "what touches ACCOUNTS?"
+mainframe-brain explore    --store-path brain.db --node Program:default:INTCALC01
 ```
 
 ## Architecture

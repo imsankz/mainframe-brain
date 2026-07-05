@@ -147,7 +147,7 @@ class SQLPLExtractor:
     artifact_type = "sql_pl"
 
     def can_handle(self, file_path: Path) -> bool:
-        if file_path.suffix.lower() != ".sql":
+        if file_path.suffix.lower() not in (".sql", ".ddl"):
             return False
         try:
             text = file_path.read_text(encoding="utf-8", errors="replace")

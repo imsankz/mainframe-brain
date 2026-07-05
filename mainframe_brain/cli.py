@@ -2,13 +2,15 @@
 from __future__ import annotations
 
 import importlib
+import json
 import pkgutil
+from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
 import click
 
-from mainframe_brain.graph.schema import Node, NodeType
+from mainframe_brain.graph.schema import EdgeType, Node, NodeType
 from mainframe_brain.graph.sqlite_store import SQLiteGraphStore
 
 _EXTRACTORS: list | None = None
@@ -40,6 +42,54 @@ def get_extractors() -> list:
 
 def _open(path: str, codebase_id: str = "default") -> SQLiteGraphStore:
     return SQLiteGraphStore(path, codebase_id=codebase_id)
+
+
+def _triage_candidates(store, cache, redaction_config) -> list[tuple[Node, str, str]]:
+    """Paragraphs needing (re-)enrichment: (node, reason, post_redaction_hash).
+
+    reason is one of: "new" (no IMPLEMENTS_RULE edge yet), "stale" (cache flagged
+    stale, e.g. flagged-wrong by a reviewer), "changed" (source redaction hash no
+    longer matches any linked BusinessRule). Triage excludes "new" — first-time
+    enrichment is the `enrich` command's job; triage surfaces only re-enrichment.
+    """
+    impl_edges: dict[str, list[str]] = defaultdict(list)
+    for e in store.all_edges():
+        if e.type == EdgeType.IMPLEMENTS_RULE:
+            impl_edges[e.src].append(e.dst)
+    out: list[tuple[Node, str, str]] = []
+    for n in store.all_nodes():
+        if n.type != NodeType.PARAGRAPH:
+            continue
+        source = n.properties.get("source", "")
+        if not source:
+            continue
+        redacted, _report = _redact(source, redaction_config)
+        cur_hash = _content_hash(redacted)
+        br_ids = impl_edges.get(n.id, [])
+        if not br_ids:
+            out.append((n, "new", cur_hash))
+            continue
+        brs = [b for b in (store.get_node(bid) for bid in br_ids) if b is not None]
+        current = any(
+            b.content_hash == cur_hash and not cache.is_stale(b.content_hash) for b in brs
+        )
+        if current:
+            continue
+        reason = "stale" if any(cache.is_stale(b.content_hash) for b in brs) else "changed"
+        out.append((n, reason, cur_hash))
+    return out
+
+
+def _redact(text, config):
+    from mainframe_brain.redaction import redact
+
+    return redact(text, config)
+
+
+def _content_hash(text: str) -> str:
+    from mainframe_brain.extractors.base import content_hash
+
+    return content_hash(text)
 
 
 @click.group()
@@ -94,11 +144,20 @@ def extract(path: Path, codebase_id: str, out: str) -> None:
 @cli.command(name="list-nodes")
 @click.option("--store-path", "store_path", required=True)
 @click.option("--type", "type_", default=None)
-def list_nodes(store_path: str, type_: str | None) -> None:
-    """List nodes in the store (optionally filtered by type)."""
+@click.option(
+    "--low-confidence",
+    "low_confidence",
+    is_flag=True,
+    default=False,
+    help="Only print nodes with parse_confidence < 1.0 (partial-parse survivors).",
+)
+def list_nodes(store_path: str, type_: str | None, low_confidence: bool) -> None:
+    """List nodes in the store (optionally filtered by type and confidence)."""
     store = _open(store_path)
     for n in store.all_nodes():
         if type_ and n.type.value != type_:
+            continue
+        if low_confidence and n.parse_confidence >= 1.0:
             continue
         h = n.content_hash[:8] if n.content_hash else "-"
         click.echo(f"{n.id}  hash={h}  conf={n.parse_confidence:.2f}")
@@ -214,10 +273,11 @@ def enrich(
     store = _open(store_path)
 
     from mainframe_brain.enrichment import Enricher
+    from mainframe_brain.enrichment.cache import NarrationCache
     from mainframe_brain.enrichment.models.anthropic_adapter import AnthropicAdapter
     from mainframe_brain.enrichment.models.mock_adapter import MockAdapter
     from mainframe_brain.enrichment.models.openai_adapter import OpenAIAdapter
-    from mainframe_brain.extractors.base import LogicalUnit, content_hash
+    from mainframe_brain.extractors.base import LogicalUnit
     from mainframe_brain.redaction import RedactionConfig
 
     if adapter == "anthropic":
@@ -227,25 +287,20 @@ def enrich(
     else:
         adapter_inst = MockAdapter()
 
-    enricher = Enricher(adapter_inst, store, RedactionConfig(), budget_tokens=budget)
+    redaction_config = RedactionConfig()
+    enricher = Enricher(adapter_inst, store, redaction_config, budget_tokens=budget)
+    cache = NarrationCache(store._conn)
 
-    enriched_src_ids = {
-        e.src for e in store.all_edges() if e.type.value == "IMPLEMENTS_RULE"
-    }
+    candidates = _triage_candidates(store, cache, redaction_config)
     items = []
-    for n in store.all_nodes():
-        if n.type != NodeType.PARAGRAPH or n.id in enriched_src_ids:
-            continue
-        source = n.properties.get("source", "")
-        if not source:
-            continue
+    for n, _reason, cur_hash in candidates:
         items.append(
             {
                 "unit": LogicalUnit(
                     kind="paragraph",
                     name=n.name,
-                    source=source,
-                    content_hash=n.content_hash or content_hash(source),
+                    source=n.properties.get("source", ""),
+                    content_hash=cur_hash,
                     post_expansion=bool(n.properties.get("replacing_applied")),
                 ),
                 "source_node_id": n.id,
@@ -262,14 +317,7 @@ def enrich(
     click.echo(f"skipped: {r.skipped}")
 
 
-@cli.command()
-@click.option("--store-path", "store_path", required=True)
-@click.argument("rule_id")
-def verify(store_path: str, rule_id: str) -> None:
-    """Mark a BusinessRule node human_verified=True."""
-    store = _open(store_path)
-    from mainframe_brain.enrichment.cache import NarrationCache
-
+def _resolve_rule(store, rule_id: str) -> Node | None:
     n = store.get_node(rule_id)
     if not n:
         for cand in store.all_nodes():
@@ -277,15 +325,194 @@ def verify(store_path: str, rule_id: str) -> None:
                 n = cand
                 break
     if not n or n.type != NodeType.BUSINESS_RULE:
+        return None
+    return n
+
+
+@cli.command()
+@click.option("--store-path", "store_path", required=True)
+@click.argument("rule_id")
+def verify(store_path: str, rule_id: str) -> None:
+    """Mark a BusinessRule node human_verified=True (approve). Clears any stale flag."""
+    store = _open(store_path)
+    from mainframe_brain.enrichment.cache import NarrationCache
+
+    n = _resolve_rule(store, rule_id)
+    if not n:
         click.echo(f"no BusinessRule matching '{rule_id}'")
         store.close()
         return
 
     n.properties["human_verified"] = True
+    n.properties.pop("flagged_reason", None)
+    n.properties.pop("flagged_at", None)
     n.last_verified = _now_iso()
     store.add_node(n)
-    NarrationCache(store._conn).mark_verified(n.content_hash, True)
+    cache = NarrationCache(store._conn)
+    cache.mark_verified(n.content_hash, True)
+    cache.mark_stale(n.content_hash, False)
     click.echo(f"verified: {n.id}")
+    store.close()
+
+
+@cli.command(name="flag")
+@click.option("--store-path", "store_path", required=True)
+@click.option("--rule", "rule_id", required=True)
+@click.option("--reason", required=True)
+def flag_rule(store_path: str, rule_id: str, reason: str) -> None:
+    """Flag a BusinessRule as wrong. Marks the narration cache stale so triage re-queues it."""
+    store = _open(store_path)
+    from mainframe_brain.enrichment.cache import NarrationCache
+
+    n = _resolve_rule(store, rule_id)
+    if not n:
+        click.echo(f"no BusinessRule matching '{rule_id}'")
+        store.close()
+        return
+
+    n.properties["human_verified"] = False
+    n.properties["flagged_reason"] = reason
+    n.properties["flagged_at"] = _now_iso()
+    store.add_node(n)
+    NarrationCache(store._conn).mark_stale(n.content_hash, True)
+    click.echo(f"flagged: {n.id} reason={reason!r}")
+    store.close()
+
+
+@cli.command(name="edit-rule")
+@click.option("--store-path", "store_path", required=True)
+@click.option("--rule", "rule_id", required=True)
+@click.option("--rule-text", "text", required=True)
+def edit_rule(store_path: str, rule_id: str, text: str) -> None:
+    """Replace a BusinessRule's rule text and mark it human-verified/edited."""
+    store = _open(store_path)
+    from mainframe_brain.enrichment.cache import NarrationCache
+
+    n = _resolve_rule(store, rule_id)
+    if not n:
+        click.echo(f"no BusinessRule matching '{rule_id}'")
+        store.close()
+        return
+
+    n.properties["rule"] = text
+    n.properties["human_verified"] = True
+    n.properties["edited_by_human"] = True
+    n.last_verified = _now_iso()
+    store.add_node(n)
+
+    cache = NarrationCache(store._conn)
+    payload = cache.get(n.content_hash)
+    if payload is not None:
+        payload.pop("stale", None)
+        payload["rule"] = text
+        payload["human_verified"] = True
+        cache.put(n.content_hash, payload, human_verified=True)
+        cache.mark_stale(n.content_hash, False)
+    click.echo(f"edited: {n.id}")
+    store.close()
+
+
+@cli.command(name="build-graph")
+@click.option("--store-path", "store_path", required=True)
+@click.option(
+    "--from-json",
+    "from_json",
+    default=None,
+    type=click.Path(),
+    help="Reserved for forward-compat (MVP reads the store).",
+)
+def build_graph(store_path: str, from_json: str | None) -> None:
+    """Print node/edge counts and logical-unit discoverability from an existing brain."""
+    store = _open(store_path)
+    node_counts: dict[str, int] = defaultdict(int)
+    edge_counts: dict[str, int] = defaultdict(int)
+    units = 0
+    for n in store.all_nodes():
+        node_counts[n.type.value] += 1
+        if n.type == NodeType.PARAGRAPH:
+            units += 1
+    for e in store.all_edges():
+        et = e.type.value if hasattr(e.type, "value") else str(e.type)
+        edge_counts[et] += 1
+    click.echo("nodes by type:")
+    for t, c in sorted(node_counts.items()):
+        click.echo(f"  {t}: {c}")
+    click.echo("edges by type:")
+    for t, c in sorted(edge_counts.items()):
+        click.echo(f"  {t}: {c}")
+    click.echo(f"logical units discoverable: {units}")
+    store.close()
+
+
+@cli.command()
+@click.option("--store-path", "store_path", required=True)
+@click.option("--budget", default=50000, type=int)
+@click.option("--threshold", default=3.0, type=float)
+@click.option("--json", "as_json", is_flag=True)
+def triage(store_path: str, budget: int, threshold: float, as_json: bool) -> None:
+    """Layer 3 — build the re-enrichment work queue (stale/changed paragraphs only)."""
+    store = _open(store_path)
+    from mainframe_brain.enrichment.cache import NarrationCache
+    from mainframe_brain.redaction import RedactionConfig
+    from mainframe_brain.triage.risk import combined_risk, risk_score
+
+    cache = NarrationCache(store._conn)
+    candidates = _triage_candidates(store, cache, RedactionConfig())
+    re_items = [
+        (n, reason, cur_hash)
+        for n, reason, cur_hash in candidates
+        if reason != "new"
+    ]
+
+    ranked: list[dict] = []
+    for n, reason, cur_hash in re_items:
+        base = risk_score(n)
+        score = combined_risk(store, n, base)
+        tokens_est = max(1, len(n.properties.get("source", "")) // 4)
+        ranked.append(
+            {
+                "name": n.name,
+                "node_id": n.id,
+                "risk_score": round(score, 4),
+                "tokens_estimate": tokens_est,
+                "reason": reason,
+                "content_hash": cur_hash,
+            }
+        )
+
+    ranked.sort(key=lambda it: it["risk_score"], reverse=True)
+
+    chosen: list[dict] = []
+    used = 0
+    skipped = 0
+    for item in ranked:
+        if item["risk_score"] < threshold:
+            skipped += 1
+            continue
+        if used + item["tokens_estimate"] > budget:
+            skipped += 1
+            continue
+        chosen.append(item)
+        used += item["tokens_estimate"]
+
+    if as_json:
+        payload_out = {
+            "items": chosen,
+            "total_tokens": used,
+            "budget_remaining": budget - used,
+            "skipped_count": skipped,
+        }
+        click.echo(json.dumps(payload_out, indent=2, default=str))
+    else:
+        click.echo(
+            f"work queue: {len(chosen)} item(s), {used} tokens, budget {budget}, "
+            f"skipped {skipped}"
+        )
+        for item in chosen[:10]:
+            click.echo(
+                f"{item['name']} | {item['risk_score']} | "
+                f"{item['tokens_estimate']} | {item['reason']}"
+            )
     store.close()
 
 

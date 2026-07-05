@@ -33,11 +33,6 @@ _CREATE_VIEW_RE = re.compile(
     r"(?P<body>SELECT\s+.*?)\s*;",
     _KW | re.DOTALL,
 )
-_CREATE_TRIGGER_RE = re.compile(
-    r"CREATE\s+TRIGGER\s+(?P<name>[A-Za-z_][\w$#]*)\b",
-    _KW,
-)
-
 _DDL_MARKER_RE = re.compile(
     r"CREATE\s+(TABLE|VIEW|INDEX|TRIGGER|PROCEDURE|FUNCTION)\b",
     _KW,
@@ -127,9 +122,6 @@ class DB2DDLExtractor:
 
         for m in _CREATE_VIEW_RE.finditer(text):
             self._emit_view(m.group("name"), m.group("body"), codebase_id, result)
-
-        for m in _CREATE_TRIGGER_RE.finditer(text):
-            self._emit_trigger_marker(m.group("name"), codebase_id, result)
 
         return result
 
@@ -347,18 +339,4 @@ class DB2DDLExtractor:
             properties={"underlying_tables": tables},
         ))
 
-    def _emit_trigger_marker(
-        self, name: str, codebase_id: str, result: ExtractionResult
-    ) -> None:
-        result.nodes.append(Node(
-            id=make_node_id("Trigger", codebase_id, name),
-            type=NodeType.TRIGGER,
-            name=name,
-            codebase_id=codebase_id,
-            content_hash="",
-            parse_confidence=0.3,
-            properties={"note": "DDL marker only; full extraction by trigger_extractor"},
-        ))
-
-
-__all__ = ["DB2DDLExtractor"]
+    __all__ = ["DB2DDLExtractor"]
