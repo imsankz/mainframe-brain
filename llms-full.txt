@@ -1,0 +1,294 @@
+# Mainframe Brain — Full Content for AI Agents
+
+> Comprehensive reference for the Mainframe Brain project — extractors, graph schema, triage pipeline, enrichment system, CLI, and developer guide.
+
+---
+
+## Overview
+
+**GitHub:** https://github.com/imsankz/mainframe-brain
+**License:** Apache 2.0
+**Python:** >= 3.10
+**CI:** GitHub Actions (ruff, pytest, mypy)
+
+Mainframe Brain solves the problem of institutional knowledge loss in mainframe shops where engineers who understand COBOL/JCL/CICS are retiring. It builds a persistent, team-owned knowledge graph from legacy source code — separating free deterministic parsing from paid LLM enrichment.
+
+### What it does
+
+1. **Extract** (Layer 1, zero tokens) — parses COBOL, JCL, CICS BMS, DB2 DDL, SQL PL stored procedures, DB2 triggers, and VSAM/sequential files.
+2. **Triage** (Layer 3, zero tokens) — content-hash diffs against last run, deduplicates near-identical paragraphs, ranks by deterministic risk.
+3. **Redact** (Layer 3.5, hard gate) — SSN-shaped numbers, card numbers, IBAN, routing numbers, embedded credentials scrubbed before anything reaches a model.
+4. **Enrich** (Layer 4, only new/changed units) — narrates the undocumented 80% of business logic. Cache keys are post-expansion-and-post-redaction content hashes.
+5. **Query** (Layer 6, zero tokens) — call-graph, data-lineage, trigger-chain, and change-impact queries answered by graph traversal alone.
+
+### What it explicitly does NOT do (v1)
+- Live DB2 catalog access (DDL exports only)
+- Compliance/audit tool framing (documentation aid only)
+- Custom graph-rendering engine (use Mermaid/Cytoscape)
+
+---
+
+## Installation
+
+### Development install
+```bash
+pip3 install -e ".[dev]" --break-system-packages
+```
+
+This installs the package with dev dependencies (pytest, ruff, mypy). The `--break-system-packages` flag is needed on macOS (PEP 668).
+
+### Runtime dependencies (minimal)
+- **Required:** click, pydantic>=2.5, jinja2>=3.1
+- **Optional (graph):** kuzu>=0.4 for KùzuDB graph backend
+- **Optional (viz):** mermaid-py>=0.5 for Mermaid diagram generation
+- **Optional (llm):** anthropic>=0.40, openai>=1.40
+
+---
+
+## CLI Reference
+
+### `mainframe-brain extract`
+
+```bash
+mainframe-brain extract <path> --out <sqlite_path>
+```
+
+Deterministically parses all supported artifact types in the given directory tree and writes structural facts to the knowledge graph store.
+
+Supports: `examples/cobol`, `examples/db2`, `examples/jcl`, `examples/cics_bms`, `examples/vsam`.
+
+**Key behavior:** `parse_confidence < 1.0` on partial parse — never silently drops a node. Multi-extractor per file allowed (cobol + vsam both read .cbl), but coordinated by owned node types to avoid emitting duplicates.
+
+### `mainframe-brain triage`
+
+```bash
+mainframe-brain triage --store-path <path>
+```
+
+Layer 3 pipeline:
+- Content-hash diff against previous run
+- Deduplication of near-identical paragraphs
+- Risk scoring: cyclomatic complexity + GOTO density + external calls + cascade depth + trigger-chain depth + parse-confidence penalty
+
+### `mainframe-brain list-nodes`
+
+```bash
+mainframe-brain list-nodes --store-path <path>
+mainframe-brain list-nodes --store-path <path> --low-confidence
+```
+
+Lists all nodes in the knowledge graph. `--low-confidence` filters for nodes with confidence < 1.0.
+
+### `mainframe-brain query`
+
+```bash
+mainframe-brain query --store-path <path> "what touches ACCOUNTS"
+mainframe-brain query --store-path <path> "impact of ACCOUNTS"
+mainframe-brain query --store-path <path> "show triggers on TXNLOG"
+```
+
+Graph-traversal-based queries that answer:
+- Call-graph: "what runs [program]" or "what calls [subprogram]"
+- Data-lineage: "what touches [data entity]"
+- Trigger-chain: "show triggers on [table]"
+- Impact analysis: "impact of [entity]" — what would break if this changes
+
+### `mainframe-brain enrich`
+
+```bash
+mainframe-brain enrich --store-path <path> --budget <tokens> --adapter <mock|anthropic|openai>
+```
+
+Selective LLM enrichment of nodes that are new or changed since last run. Cache keys are post-expansion-and-post-redaction content hashes — unchanged code is skipped.
+
+**Adapters:**
+- `mock` — zero-cost demo narration (no API keys needed)
+- `anthropic` — requires `ANTHROPIC_API_KEY`
+- `openai` — requires `OPENAI_API_KEY`
+
+### `mainframe-brain verify`
+
+```bash
+mainframe-brain verify --store-path <path> "BusinessRule:default:2000-CALC-INTEREST:987b31a8"
+```
+
+View an LLM-generated enrichment narrative for a specific business rule node.
+
+### `mainframe-brain flag`
+
+```bash
+mainframe-brain flag --store-path <path> --rule "BusinessRule:default:9000-ERROR:7b1c624e" --reason "needs SME review"
+```
+
+Flag a business rule for manual SME (subject matter expert) review.
+
+### `mainframe-brain edit-rule`
+
+```bash
+mainframe-brain edit-rule --store-path <path> --rule "BusinessRule:default:0000-MAIN:e8b6f26b" --rule-text "Main driver schedule paragraph"
+```
+
+Edit or overwrite the explanatory text for a business rule node.
+
+---
+
+## Architecture
+
+### 6-Layer Model
+
+```
+Layer 1  Extract     Deterministic parsers (zero LLM tokens)
+         │
+Layer 2  Graph       Versioned knowledge graph (structural facts)
+         │
+Layer 3  Triage      Content-hash diff, dedup, risk scoring (zero tokens)
+         │
+Layer 3.5 Redact     Hard gate — PII scrubbed before LLM (zero tokens)
+         │
+Layer 4  Enrich      Selective LLM narration (cached by content hash)
+         │
+Layer 6  Query       Graph traversal queries (zero tokens)
+```
+
+### Project Structure
+
+```
+mainframe_brain/
+├── __init__.py
+├── cli.py                    # Layer 6 entry — thin orchestrator (21K lines)
+├── extractors/               # Layer 1 — one folder per language family
+│   ├── cobol/                # COBOL programs and copybooks
+│   ├── jcl/                  # JCL jobs and steps
+│   ├── cics_bms/             # CICS BMS mapsets
+│   ├── db2/                  # DB2 DDL, SQL PL, triggers
+│   └── vsam/                 # VSAM and sequential file definitions
+├── graph/                    # Layer 2 — versioned public contract
+│   ├── schema.py             # Graph node/edge definitions + SCHEMA_VERSION
+│   ├── store.py              # Abstract store interface
+│   └── sqlite_store.py       # SQLite implementation
+├── triage/                   # Layer 3 — diff, dedup, risk scoring, work queue
+├── redaction/                # Layer 3.5 — hard gate (PII/credential scrubbing)
+├── enrichment/               # Layer 4 — model-agnostic LLM enrichment
+│   └── models/               # Model adapters (anthropic, openai, mock)
+├── explorer/                 # Graph exploration utilities
+└── skills/                   # Agent skill definitions
+
+docs/
+├── ARCHITECTURE.md           # Full architecture documentation (29K chars)
+├── SCHEMA.md                 # Graph schema reference (4.4K chars)
+└── MIGRATIONS.md             # Schema migration history
+
+examples/
+├── cobol/                    # Sample COBOL programs
+├── db2/                      # Sample DB2 DDL
+├── jcl/                      # Sample JCL
+├── cics_bms/                 # Sample CICS BMS mapsets
+└── vsam/                     # Sample VSAM file definitions
+
+tests/
+├── unit/                     # Extractor/store/triage/enrichment tests
+└── golden/                   # Fixture-level parse tests (golden file comparisons)
+```
+
+---
+
+## Graph Schema
+
+### Versioned Schema
+
+Schema changes bump `SCHEMA_VERSION` in `mainframe_brain/graph/schema.py` and add a migration row to `docs/MIGRATIONS.md`.
+
+### Node Types
+- `Program` — COBOL program (IDENTIFICATION DIVISION)
+- `Copybook` — COBOL copybook
+- `Paragraph` — COBOL paragraph (PROCEDURE DIVISION unit)
+- `DataItem` — COBOL data item (WORKING-STORAGE, LINKAGE, FILE SECTION)
+- `JCLJob` — JCL job statement
+- `JCLStep` — JCL EXEC step
+- `DDStatement` — JCL DD statement
+- `BMSMapset` — CICS BMS mapset
+- `BMSMap` — CICS BMS map
+- `Table` — DB2 table (CREATE TABLE)
+- `View` — DB2 view (CREATE VIEW)
+- `Index` — DB2 index (CREATE INDEX)
+- `StoredProcedure` — SQL PL stored procedure
+- `Trigger` — DB2 trigger
+- `VSAMFile` — VSAM file definition
+- `BusinessRule` — LLM-enriched business rule (Layer 4)
+
+### Edge Types
+- `CALLS` — program → subprogram call
+- `EXEC` — JCL step → program execution
+- `CONTAINS` — parent → child containment
+- `USES` — program → data item reference
+- `REFERENCES` — any → table/view reference
+- `TRIGGERS_ON` — trigger → table
+- `HAS_RULE` — code unit → business rule
+
+---
+
+## Development Conventions
+
+### Code Style
+- **No comments unless non-obvious WHY** — the code should speak for itself
+- **Type hints everywhere** — full mypy strict mode compliance
+- **Line length:** 110 characters
+- **Linter:** ruff (select: E, F, I, UP, B, SIM)
+- **Formatter:** ruff format
+
+### Testing
+```bash
+# Run all tests
+python3 -m pytest tests/ -q
+
+# Unit tests only
+python3 -m pytest tests/unit/ -q
+
+# Golden tests only (fixture-based parsing)
+python3 -m pytest tests/golden/ -q
+```
+
+### Linting & Type Checking
+```bash
+# Lint (must pass zero errors before commit)
+python3 -m ruff check mainframe_brain tests --config pyproject.toml
+
+# Auto-fix
+python3 -m ruff check --fix mainframe_brain tests --config pyproject.toml
+
+# Type check (optional, not enforced yet)
+python3 -m mypy mainframe_brain --ignore-missing-imports
+```
+
+### Smoke Test (End-to-End)
+```bash
+rm -f /tmp/mb.db
+python3 -m mainframe_brain.cli extract examples/cobol    --out /tmp/mb.db
+python3 -m mainframe_brain.cli extract examples/db2      --out /tmp/mb.db
+python3 -m mainframe_brain.cli extract examples/jcl      --out /tmp/mb.db
+python3 -m mainframe_brain.cli extract examples/cics_bms --out /tmp/mb.db
+python3 -m mainframe_brain.cli triage                    --store-path /tmp/mb.db
+python3 -m mainframe_brain.cli list-nodes --store-path /tmp/mb.db
+python3 -m mainframe_brain.cli query --store-path /tmp/mb.db "what touches ACCOUNTS"
+python3 -m mainframe_brain.cli enrich --store-path /tmp/mb.db --budget 20000 --adapter mock
+python3 -m mainframe_brain.cli triage --store-path /tmp/mb.db
+python3 -m mainframe_brain.cli verify --store-path /tmp/mb.db "BusinessRule:default:2000-CALC-INTEREST:987b31a8"
+python3 -m mainframe_brain.cli flag --store-path /tmp/mb.db --rule "BusinessRule:default:9000-ERROR:7b1c624e" --reason "needs SME review"
+python3 -m mainframe_brain.cli edit-rule --store-path /tmp/mb.db --rule "BusinessRule:default:0000-MAIN:e8b6f26b" --rule-text "Main driver schedule paragraph"
+```
+
+---
+
+## Key Design Decisions
+
+### Why deterministic extraction first?
+LLM costs scale with codebase size. By extracting everything deterministically first (zero tokens), the knowledge graph is complete even without enrichment. LLM enrichment is only applied to undocumented business logic that changes between runs — content-hash caching means unchanged code costs zero over time.
+
+### Why model-agnostic?
+No vendor lock-in. The enrichment layer has adapters for Anthropic Claude, OpenAI GPT, and a mock adapter for zero-cost demos. Adding a new provider means writing one adapter file.
+
+### Why SQLite by default?
+Portability. A single `.db` file can be checked into version control, shared via email, or published alongside documentation. No external services, no setup, no ongoing costs.
+
+### Why a redaction gate (Layer 3.5)?
+Mainframe codebases often contain embedded credentials, test SSNs, financial account numbers, and other PII. The redaction layer uses regex patterns (SSN, credit card, IBAN, routing number, credential patterns) to scrub data before it reaches any LLM provider.

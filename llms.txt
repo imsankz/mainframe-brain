@@ -1,0 +1,58 @@
+# Mainframe Brain
+
+> **An open-source, model-agnostic knowledge system for legacy mainframe applications.** Deterministic extraction of COBOL, JCL, CICS, DB2, and VSAM structure into a portable knowledge graph you own — with selective, content-hashed LLM enrichment of undocumented business rules.
+
+The missing middle layer between *parser* and *migration accelerator*: a tool that builds something a team **owns**, that **persists**, and that **compounds** the longer it's used — without vendor lock-in and without re-paying token costs for unchanged code.
+
+## Quick Start
+
+```bash
+pip3 install -e ".[dev]" --break-system-packages
+```
+
+## Core CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `mainframe-brain extract <path>` | Extract structure from COBOL, JCL, CICS, DB2, VSAM files |
+| `mainframe-brain triage` | Diff, deduplicate, risk-score extracted nodes |
+| `mainframe-brain query` | Query the knowledge graph (call-graph, data-lineage, impact) |
+| `mainframe-brain enrich` | LLM-narrate undocumented business rules (cached by content hash) |
+| `mainframe-brain verify` | View LLM-generated rule narrative |
+| `mainframe-brain flag` | Flag a rule as needing SME review |
+| `mainframe-brain edit-rule` | Edit a rule's explanatory text |
+| `mainframe-brain list-nodes` | List all nodes (optionally filter by low confidence) |
+
+## Architecture (6 Layers)
+
+1. **Extract** (Layer 1) — Deterministic parsers for COBOL, JCL, CICS BMS, DB2 DDL, SQL PL, DB2 triggers, VSAM. **Zero LLM tokens.**
+2. **Graph** (Layer 2) — Versioned knowledge graph (SQLite, optional Kùzu). Structural facts only.
+3. **Triage** (Layer 3) — Content-hash diff, near-identical dedup, deterministic risk scoring. **Zero tokens.**
+4. **Redact** (Layer 3.5) — Hard gate: SSN, credit cards, IBAN, routing numbers, credentials scrubbed before LLM. **Zero tokens.**
+5. **Enrich** (Layer 4) — Selective LLM narration of undocumented logic. Cached by post-expansion-and-post-redaction content hash.
+6. **Query** (Layer 6) — Call-graph, data-lineage, trigger-chain, change-impact via graph traversal. **Zero tokens.**
+
+## Supported Artifact Types
+
+- COBOL programs and copybooks
+- JCL (Job Control Language) jobs and steps
+- CICS BMS mapsets
+- DB2 DDL (CREATE TABLE, INDEX, VIEW, etc.)
+- SQL PL stored procedures
+- DB2 triggers
+- VSAM and sequential file definitions
+
+## Key Design Principles
+
+- **Deterministic first** — parsers extract everything without LLM cost
+- **Content-hash caching** — unchanged code costs zero on re-run
+- **Model-agnostic** — works with Anthropic, OpenAI, or mock adapter
+- **Redaction gate** — PII/credentials never reach LLM
+- **Versioned schema** — graph schema bumps with migration docs
+- **Portable** — single SQLite file, no external services required
+
+## Contact
+
+- GitHub: https://github.com/imsankz/mainframe-brain
+- License: Apache 2.0
+- Python: 3.10+
