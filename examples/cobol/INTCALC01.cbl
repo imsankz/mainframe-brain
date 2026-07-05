@@ -1,0 +1,44 @@
+IDENTIFICATION DIVISION.
+       PROGRAM-ID. INTCALC01.
+      *  Interest calculation driver -- Phase 1 demo program.
+       AUTHOR. MAINFRAME-BRAIN.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SOURCE-COMPUTER. IBM-390.
+       INPUT-OUTPUT SECTION.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       COPY ACCTFLDS REPLACING ==ACCT-ID== BY ==CUST-ID==.
+       01  WS-INTEREST       PIC 9(7)V99   VALUE ZERO.
+       01  WS-PRINCIPAL      PIC 9(9)      VALUE ZERO.
+       01  WS-RATE           PIC 9V99      VALUE ZERO.
+       01  WS-YEARS          PIC 9(2)      VALUE ZERO.
+       01  WS-STATUS         PIC X(1)      VALUE SPACE.
+          88  ACTIVE-ACCT    VALUE "A".
+          88  CLOSED-ACCT   VALUE "C".
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           PERFORM 1000-INIT
+           PERFORM 2000-CALC-INTEREST THRU 2999-CALC-EXIT
+           PERFORM 3000-WRITE-RESULT
+           GOBACK.
+       1000-INIT.
+           EXEC SQL
+               SELECT BALANCE, RATE, STATUS
+               INTO :WS-PRINCIPAL, :WS-RATE, :WS-STATUS
+               FROM ACCOUNTS
+               WHERE ACCT_ID = :HV-ACCT
+           END-EXEC
+           IF WS-STATUS NOT = "A"
+               GO TO 9000-ERROR
+           END-IF.
+       2000-CALC-INTEREST.
+           COMPUTE WS-INTEREST = WS-PRINCIPAL * WS-RATE * WS-YEARS.
+       2999-CALC-EXIT.
+           EXIT.
+       3000-WRITE-RESULT.
+           DISPLAY "INTEREST=" WS-INTEREST.
+           CALL "SUBPROG" USING WS-INTEREST.
+       9000-ERROR.
+           DISPLAY "ACCOUNT NOT ACTIVE".
+           GOBACK.
