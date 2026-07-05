@@ -231,14 +231,25 @@ class CobolExtractor:
             )
 
         for callee in parsed.calls:
+            callee_id = make_node_id("Program", codebase_id, callee)
             edges.append(
                 Edge(
                     src=program_node.id,
-                    dst=make_node_id("Program", codebase_id, callee),
+                    dst=callee_id,
                     type=EdgeType.CALLS,
                     properties={"callee": callee},
                 )
             )
+            if callee != program_name:
+                placeholder = Node(
+                    id=callee_id,
+                    type=NodeType.PROGRAM,
+                    name=callee,
+                    codebase_id=codebase_id,
+                    parse_confidence=0.0,
+                    properties={"placeholder": True, "seen_via": "COBOL CALL"},
+                )
+                nodes.append(placeholder)
 
         for inc in parsed.includes:
             edges.append(

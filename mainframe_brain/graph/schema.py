@@ -9,7 +9,7 @@ import enum
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-SCHEMA_VERSION = "1.1.0"
+SCHEMA_VERSION = "1.2.0"
 
 
 class NodeType(str, enum.Enum):
@@ -58,6 +58,7 @@ class EdgeType(str, enum.Enum):
     PRODUCES_REPORT = "PRODUCES_REPORT"  # JCLJob/Step → Report
     CALLS_EXTERNAL = "CALLS_EXTERNAL"  # Program → ExternalSystem
     XCTLS = "XCTLS"                     # CICS pseudo-conversational handoff (deferred)
+    EXECUTES = "EXECUTES"               # JCLStep → Program (job runs which program)
 
 
 @dataclass

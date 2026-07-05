@@ -1,6 +1,6 @@
 # Mainframe Brain — Graph Schema
 
-**Version:** `1.1.0` — public contract. Breaking changes require a migration path.
+**Version:** `1.2.0` — public contract. Breaking changes require a migration path.
 See `mainframe_brain/graph/schema.py` for the canonical definition.
 
 ## Node types
@@ -58,6 +58,7 @@ Triage downweights low-confidence nodes to avoid spending tokens on garbage.
 | `PRODUCES_REPORT` | {JCLJob, JCLStep} → Report | job's business output (deferred) |
 | `CALLS_EXTERNAL` | Program → ExternalSystem | MQ/HTTP/vendor outbound (deferred-class) |
 | `XCTLS` | Program → Program | CICS pseudo-conversational handoff (deferred) |
+| `EXECUTES` | JCLStep → Program | `EXEC PGM=name` — this step runs this program |
 
 ## Schema versioning
 

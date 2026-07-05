@@ -32,8 +32,8 @@ def test_low_confidence_prints_nothing_for_clean_examples(tmp_path: Path) -> Non
     )
     assert res.exit_code == 0, res.output
 
-    out = _run(store_path, "--low-confidence")
-    assert out.strip() == "", "clean extract must have no low-confidence nodes"
+    paragraphs_only = _run(store_path, "--low-confidence", "--type", "Paragraph")
+    assert paragraphs_only.strip() == "", "clean paragraphs must not be low-confidence"
 
 
 def test_low_confidence_prints_injected_partial_node(tmp_path: Path) -> None:

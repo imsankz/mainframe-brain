@@ -6,6 +6,7 @@ The graph schema (`mainframe_brain/graph/schema.py`) is a public contract. This 
 |---------|------------|-------------------------------------------------------------------------------------------------------|----------------|
 | 1.0.0   | 2026-07-05 | Initial schema (14 node types, 13 edge types).                                                         | n/a            |
 | 1.1.0   | 2026-07-05 | Add VSAMDataset, Report, ExternalSystem node types; FIRES_ON, TRIGGERS_TRIGGER, ABSTRACTS, CASCADES_TO, PRODUCES_REPORT, CALLS_EXTERNAL, XCTLS edge types; `parse_confidence` field on Node; `codebase_id` namespace. | Additive only — SQLiteGraphStore lazily `CREATE TABLE IF NOT EXISTS` so existing stores auto-upgrade on first open. |
+| 1.2.0   | 2026-07-05 | Add `EXECUTES` edge type (JCLStep → Program) and `placeholder: True` Program nodes for unresolved `CALL`/`EXEC PGM` targets, so cross-file call chains are no longer orphan edges. JCLStep gains `parent_job` property linking back to its JCLJob. | Additive only — pure additions, no rename/remove/required-property change. Existing stores auto-upgrade on first open. |
 |         |            |                                                                                                       |                |
 
 ## How to add a row

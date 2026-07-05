@@ -199,6 +199,7 @@ class JCLExtractor:
 
         emitted_datasets: dict[str, Node] = {}
         current_step: Node | None = None
+        current_job_id: str = ""
         step_lines: list[str] = []
 
         def flush_step() -> None:
@@ -284,6 +285,7 @@ class JCLExtractor:
                     },
                 )
                 result.nodes.append(job)
+                current_job_id = job.id
 
             elif verb == "EXEC":
                 flush_step()
@@ -304,6 +306,7 @@ class JCLExtractor:
                         "program": program,
                         "proc": invoked_proc,
                         "cond": cond_m.group(1) if cond_m else "",
+                        "parent_job": current_job_id,
                         "sysouts": [],
                         "conditions": [],
                     },
@@ -311,6 +314,20 @@ class JCLExtractor:
                 result.nodes.append(step)
                 current_step = step
                 step_lines = list(card["_lines"])
+                if program:
+                    target_id = make_node_id("Program", codebase_id, program)
+                    placeholder = Node(
+                        id=target_id,
+                        type=NodeType.PROGRAM,
+                        name=program,
+                        codebase_id=codebase_id,
+                        parse_confidence=0.0,
+                        properties={"placeholder": True, "seen_via": "JCL EXEC"},
+                    )
+                    result.nodes.append(placeholder)
+                    result.edges.append(
+                        Edge(src=step.id, dst=target_id, type=EdgeType.EXECUTES)
+                    )
 
             elif verb == "DD":
                 if current_step is None:

@@ -49,9 +49,12 @@ def test_cobol_smoke(tmp_path: Path) -> None:
 
     assert result.artifact_type == "cobol"
     programs = [n for n in result.nodes if n.type == NodeType.PROGRAM]
-    assert len(programs) == 1
-    assert programs[0].name == "DEMOPROG"
-    assert programs[0].id == "Program:default:DEMOPROG"
+    real = [p for p in programs if not p.properties.get("placeholder")]
+    assert len(real) == 1
+    assert real[0].name == "DEMOPROG"
+    assert real[0].id == "Program:default:DEMOPROG"
+    placeholders = [p for p in programs if p.properties.get("placeholder")]
+    assert any(p.name == "SUBPROG" for p in placeholders)
 
     paragraphs = [n for n in result.nodes if n.type == NodeType.PARAGRAPH]
     para_names = {p.name for p in paragraphs}

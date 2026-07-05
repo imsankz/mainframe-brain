@@ -182,6 +182,32 @@ def query(store_path: str, question: str) -> None:
         for nb, edge in _neighbors_with_edge(store, target.id):
             et = edge.type.value if hasattr(edge.type, "value") else str(edge.type)
             click.echo(f"  --[{et}]--> {nb.id} ({nb.type.value})")
+    elif q.startswith("what runs ") or q.startswith("what job runs "):
+        name = q.replace("what job runs ", "").replace("what runs ", "").strip()
+        target = _find_node(store, name, NodeType.PROGRAM)
+        if not target:
+            click.echo(f"no Program named '{name}'")
+        else:
+            callers: list[tuple] = []
+            for e in store.all_edges():
+                if e.type.value == "EXECUTES" and e.dst == target.id:
+                    step = store.get_node(e.src)
+                    if step:
+                        callers.append(("EXEC", step))
+                elif e.type.value == "CALLS" and e.dst == target.id:
+                    caller_prog = store.get_node(e.src)
+                    if caller_prog:
+                        callers.append(("CALL", caller_prog))
+            click.echo(f"{target.id} is invoked by:")
+            if not callers:
+                click.echo("  (nothing found)")
+            for kind, c in callers:
+                if kind == "EXEC":
+                    parent = c.properties.get("parent_job", "")
+                    suffix = f" [{parent}]" if parent else ""
+                    click.echo(f"  --{kind} from--> {c.id}{suffix}")
+                else:
+                    click.echo(f"  --{kind} from--> {c.id}")
     elif q.startswith("show triggers on "):
         table_name = q.replace("show triggers on ", "").strip()
         table = _find_node(store, table_name, NodeType.DB2_TABLE)
