@@ -39,6 +39,10 @@ class GraphStore(ABC):
     def neighbors(self, node_id: str, edge_type: str | None = None) -> list[Node]: ...
 
     @abstractmethod
+    def predecessors(self, node_id: str, edge_type: str | None = None) -> list[Node]:
+        """Return nodes that have an edge *to* ``node_id`` (incoming neighbors)."""
+
+    @abstractmethod
     def query(self, cypher_or_sql: str) -> list[dict]: ...
 
     @abstractmethod

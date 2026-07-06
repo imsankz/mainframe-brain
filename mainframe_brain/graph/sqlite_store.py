@@ -90,6 +90,8 @@ class SQLiteGraphStore(GraphStore):
         self._lock = threading.Lock()
         self._conn = sqlite3.connect(path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
+        self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.execute("PRAGMA busy_timeout=5000")
         with self._lock:
             self._conn.executescript(_SCHEMA_DDL)
             self._conn.execute(
@@ -160,6 +162,17 @@ class SQLiteGraphStore(GraphStore):
     def add_edge(self, edge: Edge) -> None:
         props_json = json.dumps(edge.properties, default=str, sort_keys=True)
         with self._lock:
+            cur = self._conn.execute(
+                "SELECT 1 FROM edges WHERE src=? AND dst=? AND type=?",
+                (edge.src, edge.dst, edge.type.value),
+            )
+            if cur.fetchone() is not None:
+                import warnings
+                warnings.warn(
+                    f"Duplicate edge ignored: {edge.src} -[{edge.type.value}]-> {edge.dst}",
+                    stacklevel=3,
+                )
+                return
             self._conn.execute(
                 """
                 INSERT OR IGNORE INTO edges (src, dst, type, properties, created_at)
@@ -207,7 +220,33 @@ class SQLiteGraphStore(GraphStore):
             rows = cur.fetchall()
         return [_row_to_node(r) for r in rows]
 
+    def predecessors(self, node_id: str, edge_type: str | None = None) -> list[Node]:
+        with self._lock:
+            if edge_type is not None:
+                cur = self._conn.execute(
+                    """
+                    SELECT n.* FROM nodes n
+                    JOIN edges e ON e.src = n.id
+                    WHERE e.dst = ? AND e.type = ?
+                    """,
+                    (node_id, edge_type),
+                )
+            else:
+                cur = self._conn.execute(
+                    """
+                    SELECT n.* FROM nodes n
+                    JOIN edges e ON e.src = n.id
+                    WHERE e.dst = ?
+                    """,
+                    (node_id,),
+                )
+            rows = cur.fetchall()
+        return [_row_to_node(r) for r in rows]
+
     def query(self, cypher_or_sql: str) -> list[dict]:
+        sql = cypher_or_sql.strip()
+        if not sql.upper().lstrip().startswith("SELECT") and not sql.upper().lstrip().startswith("WITH"):
+            raise ValueError(f"query() only accepts SELECT/WITH statements for safety — rejected: {sql[:80]}")
         with self._lock:
             cur = self._conn.execute(cypher_or_sql)
             cols = [d[0] for d in cur.description]

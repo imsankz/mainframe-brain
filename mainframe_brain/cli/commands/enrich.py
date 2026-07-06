@@ -29,8 +29,10 @@ def enrich(
     from mainframe_brain.enrichment.models.anthropic_adapter import AnthropicAdapter
     from mainframe_brain.enrichment.models.mock_adapter import MockAdapter
     from mainframe_brain.enrichment.models.openai_adapter import OpenAIAdapter
+    from mainframe_brain.enrichment.queue import EnrichmentQueue
     from mainframe_brain.extractors.base import LogicalUnit
     from mainframe_brain.redaction import RedactionConfig
+    from mainframe_brain.triage.risk import combined_risk, risk_score
 
     if adapter == "anthropic":
         adapter_inst = AnthropicAdapter(model=adapter_model or "claude-3-5-haiku-20241022")
@@ -60,12 +62,27 @@ def enrich(
             }
         )
 
+    # Populate the resumable enrichment queue
+    queue = EnrichmentQueue(store._conn)
+    for item in items:
+        node = store.get_node(item["source_node_id"])
+        risk = combined_risk(store, node, risk_score(node)) if node else 0.0
+        queue.add(
+            unit_hash=item["unit"].content_hash,
+            unit_kind=item["unit"].kind,
+            unit_name=item["unit"].name,
+            source_node_id=item["source_node_id"],
+            codebase_id=item.get("codebase_id", "default"),
+            risk_score=risk,
+        )
+
+    # Run enrichment from the queue
     with click.progressbar(
-        items,
+        length=queue.total_remaining(),
         label="Enriching",
-        item_show_func=lambda i: i["source_node_id"] if i else "",
     ) as bar:
-        r = enricher.enrich([i for i in bar])
+        r = enricher.enrich_from_queue(queue)
+        bar.update(queue.total_remaining())
 
     store.close()
 

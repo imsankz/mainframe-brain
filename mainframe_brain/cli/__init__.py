@@ -12,6 +12,7 @@ from mainframe_brain.cli.commands.list_nodes import list_nodes
 from mainframe_brain.cli.commands.query import query
 from mainframe_brain.cli.commands.triage import triage
 from mainframe_brain.cli.commands.verify import edit_rule, flag_rule, verify
+from mainframe_brain.cli.commands.generate_skills import generate_skills
 
 
 @click.group()
@@ -30,3 +31,4 @@ cli.add_command(edit_rule)
 cli.add_command(explore)
 cli.add_command(list_nodes)
 cli.add_command(build_graph)
+cli.add_command(generate_skills)

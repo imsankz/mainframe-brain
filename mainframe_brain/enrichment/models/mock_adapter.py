@@ -16,11 +16,12 @@ class MockAdapter(LLMAdapter):
         return "mock"
 
     def complete(self, system: str, user: str, max_tokens: int = 1024) -> tuple[str, dict]:
+        name = user.strip().split("\n")[0][:60] if user else "unknown paragraph"
         payload = {
-            "rule": "Mock business rule derived from provided source.",
+            "rule": f"Business rule for {name}: performs standard data processing with conditional branching.",
             "confidence": 0.5,
-            "line_range": [1, max(1, user.count("\n"))],
-            "edge_cases": [],
+            "line_range": [1, max(1, user.count("\n") + 1)],
+            "edge_cases": ["Review edge case around date boundary crossing"],
         }
         text = json.dumps(payload)
         return text, {

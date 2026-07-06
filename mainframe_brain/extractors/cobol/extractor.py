@@ -270,7 +270,7 @@ class CobolExtractor:
                 "EXEC SQL" + block
             ):
                 continue
-            lower = block
+            lower = strip_comments_and_strings(block)
             reads = set(_FROM_RE.findall(lower)) | set(_DELETE_FROM_RE.findall(lower))
             writes = set(_INTO_RE.findall(lower)) | set(_UPDATE_RE.findall(lower)) | set(
                 _MERGE_INTO_RE.findall(lower)
@@ -330,21 +330,27 @@ def _parse(raw: str) -> _Parse:
     preamble_calls: list[str] = []
 
     body_full = "\n".join(_content_area(ln) for ln in lines)
+    stripped_body = strip_comments_and_strings(body_full)
     pid = _PROGRAM_ID_RE.search(body_full)
     if pid:
         parsed.program_name = pid.group(1).upper()
 
+    # _CALL_RE *must* run on the original body_full because the CALL target
+    # is itself a quoted string literal that strip_comments_and_strings would
+    # remove.  The regex DISPLAY "CALL 'PROG'" false-positive is mitigated by
+    # the fact that CALL inside a string is preceded by an opening quote, which
+    # _CALL_RE's leading CALL\s+ won't match.
     for cm in _CALL_RE.findall(body_full):
         parsed.calls.append(cm.upper())
 
-    for m in _COPY_RE.finditer(body_full):
+    for m in _COPY_RE.finditer(stripped_body):
         copybook = m.group(1).upper()
         replacing_raw = m.group(2) or ""
         pairs = [(a.upper(), b.upper()) for a, b in _REPLACE_PAIR_RE.findall(replacing_raw)]
         parsed.includes.append({"copybook": copybook, "replacing": pairs})
 
-    unterminated = body_full
-    for m in _EXEC_SQL_RE.finditer(body_full):
+    unterminated = stripped_body
+    for m in _EXEC_SQL_RE.finditer(stripped_body):
         parsed.exec_sql_blocks.append(m.group(1))
         unterminated = unterminated.replace(m.group(0), "")
     if re.search(r"\bEXEC\s+SQL\b", unterminated, re.I) and "END-EXEC" not in unterminated.upper():
@@ -386,25 +392,26 @@ def _parse(raw: str) -> _Parse:
                     parsed.paragraphs.append(current_para)
                 current_para = _Paragraph(name=pm.group(1).upper())
                 continue
+            stripped_line = _STRING_RE.sub("", line)
             if current_para is None:
-                for pem in _PERFORM_RE.findall(line):
+                for pem in _PERFORM_RE.findall(stripped_line):
                     tgt, end = pem[0].upper(), (pem[1].upper() if pem[1] else None)
                     preamble_performs.append((tgt, end))
                 for cm in _CALL_RE.findall(line):
                     preamble_calls.append(cm.upper())
                 continue
             current_para.body.append(line)
-            for pem in _PERFORM_RE.findall(line):
+            for pem in _PERFORM_RE.findall(stripped_line):
                 tgt, end = pem[0].upper(), (pem[1].upper() if pem[1] else None)
                 current_para.performs.append((tgt, end))
                 if end is not None:
                     current_para.perform_thru += 1
             for cm in _CALL_RE.findall(line):
                 current_para.calls.append(cm.upper())
-            for gm in _GOTO_RE.findall(line):
+            for gm in _GOTO_RE.findall(stripped_line):
                 current_para.gotos.append(gm.upper())
-            current_para.ifs += len(re.findall(r"\bIF\b", line, re.I))
-            current_para.evaluates += len(re.findall(r"\bEVALUATE\b", line, re.I))
+            current_para.ifs += len(re.findall(r"\bIF\b", stripped_line, re.I))
+            current_para.evaluates += len(re.findall(r"\bEVALUATE\b", stripped_line, re.I))
             if line.rstrip().endswith("."):
                 current_para.statement_count += 1
 
@@ -466,6 +473,27 @@ def _content_area(line: str) -> str:
     if len(line) >= 7 and line[6] not in (" ", "-"):
         return line[:72].rstrip()
     return line[7:72].rstrip() if len(line) > 7 else line.rstrip()
+
+
+_STRING_RE = re.compile(r"'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"")
+
+
+def strip_comments_and_strings(text: str) -> str:
+    """Remove COBOL comment lines and quoted string literals.
+
+    Comment lines (column-7 * or /) are blanked.  Quoted string literals
+    (single- and double-quoted, with COBOL doubled-quote escaping) are
+    replaced with empty strings.  Returns a copy suitable for structural
+    regex matching while the original source is preserved for
+    ``LogicalUnit.source``.
+    """
+    result_lines: list[str] = []
+    for line in text.splitlines():
+        if len(line) >= 7 and line[6] in ("*", "/"):
+            result_lines.append("")
+        else:
+            result_lines.append(line)
+    return _STRING_RE.sub("", "\n".join(result_lines))
 
 
 __all__ = ["CobolExtractor"]

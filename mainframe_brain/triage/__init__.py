@@ -5,6 +5,7 @@ from mainframe_brain.triage.dedup import dedup_by_hash
 from mainframe_brain.triage.diff import DiffResult, compute_diff
 from mainframe_brain.triage.queue import WorkItem, WorkQueue, build_work_queue
 from mainframe_brain.triage.risk import (
+    RiskProfile,
     cascade_depth,
     combined_risk,
     risk_score,
@@ -13,6 +14,7 @@ from mainframe_brain.triage.risk import (
 
 __all__ = [
     "DiffResult",
+    "RiskProfile",
     "compute_diff",
     "dedup_by_hash",
     "risk_score",

@@ -16,4 +16,5 @@ htmlcov/
 *.sqlite
 *.sqlite3
 brain/
+.mainframe-brain/
 .DS_Store

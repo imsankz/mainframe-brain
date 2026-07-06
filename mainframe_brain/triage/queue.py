@@ -25,21 +25,19 @@ class WorkQueue:
     skipped_count: int = 0
 
 
-def _unit_node_id(unit: LogicalUnit, codebase_id: str) -> str:
-    return make_node_id(unit.kind.capitalize(), codebase_id, unit.name)
-
-
 def build_work_queue(
     store: GraphStore,
     units: list[LogicalUnit],
     node_lookup: dict[str, Node],
     budget_tokens: int,
     priority_threshold: float,
+    codebase_id: str = "default",
 ) -> WorkQueue:
     items: list[WorkItem] = []
     skipped = 0
     for unit in units:
-        node = node_lookup.get(unit.name)
+        node_id = make_node_id(unit.kind.capitalize(), codebase_id, unit.name)
+        node = node_lookup.get(node_id)
         if node is None:
             continue
         base = risk_score(node)
