@@ -91,10 +91,12 @@ def test_modify_paragraph_source_then_triage_one_changed(tmp_path):
     out_json = runner.invoke(cli, ["triage", "--store-path", db, "--threshold", "0.0", "--json"])
     assert out_json.exit_code == 0
     payload = json.loads(out_json.output)
-    assert payload["skipped_count"] == 0
-    assert len(payload["items"]) == 1
-    assert payload["items"][0]["reason"] == "changed"
-    assert payload["budget_remaining"] == 50000 - payload["total_tokens"]
+    assert payload["status"] == "ok"
+    assert payload["command"] == "triage"
+    assert payload["summary"]["skipped_count"] == 0
+    assert len(payload["data"]) == 1
+    assert payload["data"][0]["reason"] == "changed"
+    assert payload["summary"]["budget_remaining"] == 50000 - payload["summary"]["total_tokens"]
 
     out = runner.invoke(cli, ["enrich", "--store-path", db, "--adapter", "mock", "--budget", "50000"])
     assert out.exit_code == 0
