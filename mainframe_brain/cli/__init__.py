@@ -4,15 +4,17 @@ from __future__ import annotations
 import click
 
 from mainframe_brain.cli._common import get_extractors as get_extractors  # noqa: F401
+from mainframe_brain.cli.commands.build import build
 from mainframe_brain.cli.commands.build_graph import build_graph
 from mainframe_brain.cli.commands.enrich import enrich
 from mainframe_brain.cli.commands.explore import explore
 from mainframe_brain.cli.commands.extract import extract
+from mainframe_brain.cli.commands.generate_skills import generate_skills
+from mainframe_brain.cli.commands.impact import impact
 from mainframe_brain.cli.commands.list_nodes import list_nodes
 from mainframe_brain.cli.commands.query import query
 from mainframe_brain.cli.commands.triage import triage
 from mainframe_brain.cli.commands.verify import edit_rule, flag_rule, verify
-from mainframe_brain.cli.commands.generate_skills import generate_skills
 
 
 @click.group()
@@ -22,6 +24,7 @@ def cli() -> None:
 
 
 cli.add_command(extract)
+cli.add_command(build)
 cli.add_command(enrich)
 cli.add_command(triage)
 cli.add_command(query)
@@ -31,4 +34,5 @@ cli.add_command(edit_rule)
 cli.add_command(explore)
 cli.add_command(list_nodes)
 cli.add_command(build_graph)
+cli.add_command(impact)
 cli.add_command(generate_skills)

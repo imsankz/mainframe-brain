@@ -22,15 +22,19 @@ from mainframe_brain.cli._common import _open
 def list_nodes(store_path: str, type_: str | None, low_confidence: bool, as_json: bool) -> None:
     """List nodes in the store (optionally filtered by type and confidence)."""
     store = _open(store_path)
-    data: list[str] = []
+    data: list[dict] = []
     for n in store.all_nodes():
         if type_ and n.type.value != type_:
             continue
         if low_confidence and n.parse_confidence >= 1.0:
             continue
-        h = n.content_hash[:8] if n.content_hash else "-"
-        line = f"{n.id}  hash={h}  conf={n.parse_confidence:.2f}"
-        data.append(line)
+        data.append({
+            "id": n.id,
+            "name": n.name,
+            "type": n.type.value,
+            "confidence": round(n.parse_confidence, 2),
+            "hash": n.content_hash[:12] if n.content_hash else "",
+        })
 
     if as_json:
         click.echo(json.dumps({
@@ -41,7 +45,11 @@ def list_nodes(store_path: str, type_: str | None, low_confidence: bool, as_json
             "errors": [],
         }, indent=2, default=str))
     else:
-        for line in data:
-            click.echo(line)
+        for item in data:
+            h = item["hash"] or "-"
+            click.echo(
+                f"{item['id']}  type={item['type']}  name={item['name']}  hash={h}  "
+                f"conf={item['confidence']:.2f}"
+            )
 
     store.close()

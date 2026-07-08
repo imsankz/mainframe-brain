@@ -2,12 +2,11 @@
 from __future__ import annotations
 
 import json
-from collections import defaultdict
 
 import click
 
+from mainframe_brain.analytics import build_graph_summary
 from mainframe_brain.cli._common import _open
-from mainframe_brain.graph.schema import NodeType
 
 
 @click.command(name="build-graph")
@@ -23,16 +22,7 @@ from mainframe_brain.graph.schema import NodeType
 def build_graph(store_path: str, from_json: str | None, as_json: bool) -> None:
     """Print node/edge counts and logical-unit discoverability from an existing brain."""
     store = _open(store_path)
-    node_counts: dict[str, int] = defaultdict(int)
-    edge_counts: dict[str, int] = defaultdict(int)
-    units = 0
-    for n in store.all_nodes():
-        node_counts[n.type.value] += 1
-        if n.type == NodeType.PARAGRAPH:
-            units += 1
-    for e in store.all_edges():
-        et = e.type.value if hasattr(e.type, "value") else str(e.type)
-        edge_counts[et] += 1
+    summary = build_graph_summary(store)
     store.close()
 
     if as_json:
@@ -40,18 +30,28 @@ def build_graph(store_path: str, from_json: str | None, as_json: bool) -> None:
             "status": "ok",
             "command": "build-graph",
             "summary": {
-                "nodes_by_type": dict(sorted(node_counts.items())),
-                "edges_by_type": dict(sorted(edge_counts.items())),
-                "logical_units_discoverable": units,
+                "nodes_by_type": dict(sorted(summary["nodes_by_type"].items())),
+                "edges_by_type": dict(sorted(summary["edges_by_type"].items())),
+                "logical_units_discoverable": summary["logical_units_discoverable"],
+                "top_risk_nodes": summary["top_risk_nodes"],
+                "hub_nodes": summary["hub_nodes"],
+                "graph_health": summary["graph_health"],
             },
             "data": None,
             "errors": [],
         }, indent=2, default=str))
     else:
         click.echo("nodes by type:")
-        for t, c in sorted(node_counts.items()):
+        for t, c in sorted(summary["nodes_by_type"].items()):
             click.echo(f"  {t}: {c}")
         click.echo("edges by type:")
-        for t, c in sorted(edge_counts.items()):
+        for t, c in sorted(summary["edges_by_type"].items()):
             click.echo(f"  {t}: {c}")
-        click.echo(f"logical units discoverable: {units}")
+        click.echo(f"logical units discoverable: {summary['logical_units_discoverable']}")
+        click.echo(f"graph health: {summary['graph_health']}")
+        click.echo("top risk nodes:")
+        for item in summary["top_risk_nodes"]:
+            click.echo(f"  {item['node']['name']} ({item['risk_score']})")
+        click.echo("hub nodes:")
+        for item in summary["hub_nodes"]:
+            click.echo(f"  {item['node']['name']} ({item['degree']})")

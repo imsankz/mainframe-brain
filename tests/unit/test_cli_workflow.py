@@ -225,3 +225,62 @@ def test_build_graph_counts(tmp_path):
     assert "Paragraph: 6" in out.output
     assert "PERFORMS:" in out.output
     assert "logical units discoverable: 6" in out.output
+
+
+def test_build_command_extracts_and_reports_accessible_summary(tmp_path):
+    runner = CliRunner()
+    db = str(tmp_path / "brain.db")
+
+    out = runner.invoke(cli, ["build", str(_EXAMPLES), "--out", db, "--json"])
+    assert out.exit_code == 0
+    payload = json.loads(out.output)
+    assert payload["status"] == "ok"
+    assert payload["command"] == "build"
+    assert payload["summary"]["logical_units"] > 0
+    assert payload["summary"]["nodes_by_type"]["Paragraph"] > 0
+    assert payload["summary"]["accessible_nodes"][0]["type"] in {"Program", "Paragraph", "BusinessRule"}
+
+
+def test_list_nodes_json_includes_descriptive_fields(tmp_path):
+    runner = CliRunner()
+    db = str(tmp_path / "brain.db")
+
+    runner.invoke(cli, ["build", str(_EXAMPLES), "--out", db])
+
+    out = runner.invoke(cli, ["list-nodes", "--store-path", db, "--json"])
+    assert out.exit_code == 0
+    payload = json.loads(out.output)
+    assert payload["status"] == "ok"
+    assert payload["summary"]["count"] > 0
+    assert payload["data"][0]["id"]
+    assert payload["data"][0]["name"]
+    assert payload["data"][0]["type"]
+
+
+def test_build_graph_reports_risk_and_hub_summary(tmp_path):
+    runner = CliRunner()
+    db = str(tmp_path / "brain.db")
+
+    runner.invoke(cli, ["extract", str(_EXAMPLES), "--out", db])
+
+    out = runner.invoke(cli, ["build-graph", "--store-path", db, "--json"])
+    assert out.exit_code == 0
+    payload = json.loads(out.output)
+    assert payload["status"] == "ok"
+    assert payload["summary"]["top_risk_nodes"]
+    assert payload["summary"]["hub_nodes"]
+
+
+def test_impact_command_returns_blast_radius(tmp_path):
+    runner = CliRunner()
+    db = str(tmp_path / "brain.db")
+
+    runner.invoke(cli, ["extract", str(_EXAMPLES), "--out", db])
+
+    out = runner.invoke(cli, ["impact", "--store-path", db, "--node", "Program:default:INTCALC01", "--json"])
+    assert out.exit_code == 0
+    payload = json.loads(out.output)
+    assert payload["status"] == "ok"
+    assert payload["summary"]["target"] == "Program:default:INTCALC01"
+    assert payload["summary"]["impact_count"] >= 1
+    assert payload["data"][0]["node"]

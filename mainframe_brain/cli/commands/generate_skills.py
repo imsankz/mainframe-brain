@@ -7,7 +7,12 @@ import click
 @click.command(name="generate-skills")
 @click.option("--store-path", "store_path", required=True)
 @click.option("--output-dir", default=".mainframe-brain/skills")
-@click.option("--json", "as_json", is_flag=True, help="Output structured JSON instead of human-readable text.")
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Output structured JSON instead of human-readable text.",
+)
 def generate_skills(store_path: str, output_dir: str, as_json: bool) -> None:
     """Generate AI-tool-ready skills from the knowledge graph (Layer 7).
 
