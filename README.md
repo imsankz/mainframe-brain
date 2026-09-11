@@ -1,10 +1,12 @@
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Python 3.10–3.14](https://img.shields.io/badge/python-3.10–3.14-blue.svg)](https://www.python.org/downloads/)
 [![CI](https://github.com/imsankz/mainframe-brain/actions/workflows/ci.yml/badge.svg)](https://github.com/imsankz/mainframe-brain/actions/workflows/ci.yml)
-[![Tests: 61 passing](https://img.shields.io/badge/tests-61%20passing-brightgreen.svg)](#)
+[![Tests: 73 passing](https://img.shields.io/badge/tests-73%20passing-brightgreen.svg)](#)
 [![Scope: open-source, model-agnostic](https://img.shields.io/badge/scope-open--source,%20model--agnostic-orange.svg)](#)
 
 # Mainframe Brain
+
+[**Visit the project website →**](https://imsankz.github.io/mainframe-brain/)
 
 **An open-source, model-agnostic knowledge system for legacy mainframe applications.**
 
@@ -139,7 +141,7 @@ Adding a new artifact type = new folder under `extractors/`. Adding a new LLM pr
 
 ## Status
 
-Pre-alpha. 61 tests (unit + golden) green, ruff clean.
+Pre-alpha. 73 tests (unit + golden) green, ruff clean.
 
 **Phase 1–2 shipped:** COBOL + copybook + VSAM + DB2 DDL + SQL PL stored procedures + triggers + JCL + CICS BMS extractors, SQLite graph store, triage, redaction gate, selective LLM enrichment (mock + real adapters), CLI for extract/triage/enrich/query/explore/verify/flag/edit-rule.
 

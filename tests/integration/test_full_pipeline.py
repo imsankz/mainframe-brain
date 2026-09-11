@@ -1,4 +1,5 @@
 """End-to-end integration test: extract → triage → enrich → query → verify → flag → edit."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -97,9 +98,7 @@ def test_full_pipeline_enrich_creates_business_rules(tmp_path: Path) -> None:
     db = str(tmp_path / "brain.db")
 
     runner.invoke(cli, ["extract", str(_EXAMPLES_COBOL), "--out", db])
-    out = runner.invoke(
-        cli, ["enrich", "--store-path", db, "--adapter", "mock", "--budget", "50000"]
-    )
+    out = runner.invoke(cli, ["enrich", "--store-path", db, "--adapter", "mock", "--budget", "50000"])
     assert out.exit_code == 0, f"enrich failed: {out.output}"
     assert "created: 6" in out.output
 
@@ -245,9 +244,12 @@ def test_full_pipeline_edit_business_rule(tmp_path: Path) -> None:
         cli,
         [
             "edit-rule",
-            "--store-path", db,
-            "--rule", br_id,
-            "--rule-text", new_text,
+            "--store-path",
+            db,
+            "--rule",
+            br_id,
+            "--rule-text",
+            new_text,
         ],
     )
     assert out.exit_code == 0
@@ -289,7 +291,9 @@ def test_full_pipeline_enrichment_queue_persistence(tmp_path: Path) -> None:
     store = _open(db)
 
     # Check enrichment_queue table exists and all items are 'done'
-    rows = store._conn.execute("SELECT status, COUNT(*) as cnt FROM enrichment_queue GROUP BY status").fetchall()
+    rows = store._conn.execute(
+        "SELECT status, COUNT(*) as cnt FROM enrichment_queue GROUP BY status"
+    ).fetchall()
     statuses = {r["status"]: r["cnt"] for r in rows}
     assert statuses.get("done", 0) == 6, f"expected 6 done items, got {statuses}"
     assert statuses.get("pending", 0) == 0

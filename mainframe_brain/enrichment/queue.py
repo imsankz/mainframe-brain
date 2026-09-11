@@ -9,7 +9,6 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timezone
 
-
 _CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS enrichment_queue (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

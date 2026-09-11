@@ -69,11 +69,13 @@ class RiskReporter:
             conf_str = f"{conf:.0%}" if conf < 1.0 else "✅"
             lines.append(f"| {i} | {node.name} | {kind} | {risk:.1f} | {conf_str} |")
 
-        lines.extend([
-            "",
-            "## Risk Distribution",
-            "",
-        ])
+        lines.extend(
+            [
+                "",
+                "## Risk Distribution",
+                "",
+            ]
+        )
 
         high = sum(1 for _, r, _ in all_risky if r >= 5)
         medium = sum(1 for _, r, _ in all_risky if 2 <= r < 5)
@@ -83,13 +85,19 @@ class RiskReporter:
         lines.append(f"- 🟡 Medium risk (2–5): {medium}")
         lines.append(f"- 🟢 Low risk (<2): {low}")
         lines.append("")
-        lines.append("Risk formula: complexity×0.5 + GOTO×0.2 + ext_calls×0.15 + literals×0.1 + cascade/trigger depth")
-        lines.append("Parse confidence < 0.5 applies a 0.3× penalty to avoid false positives from partial parses.")
+        lines.append(
+            "Risk formula: complexity×0.5 + GOTO×0.2 + ext_calls×0.15 + literals×0.1 + cascade/trigger depth"
+        )
+        lines.append(
+            "Parse confidence < 0.5 applies a 0.3× penalty to avoid false positives from partial parses."
+        )
 
-        return [SkillOutput(
-            id="risk-report",
-            title="Risk Heat Map",
-            category="risk",
-            content="\n".join(lines),
-            related_nodes=[n.id for n, _, _ in top],
-        )]
+        return [
+            SkillOutput(
+                id="risk-report",
+                title="Risk Heat Map",
+                category="risk",
+                content="\n".join(lines),
+                related_nodes=[n.id for n, _, _ in top],
+            )
+        ]

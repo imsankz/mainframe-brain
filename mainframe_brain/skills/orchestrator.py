@@ -9,7 +9,6 @@ from pathlib import Path
 
 from mainframe_brain.graph.store import GraphStore
 
-from . import SkillOutput
 from .copybook import CopybookCataloger
 from .dependency import DependencyMapper
 from .historian import RuleHistorian

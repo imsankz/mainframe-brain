@@ -31,7 +31,9 @@ class PatternDetective:
         unreachable = [p for p in paragraphs if not performed_from.get(p.id)]
         if unreachable:
             findings.append("## Unreachable Paragraphs\n")
-            findings.append("These paragraphs have no PERFORMS edge pointing to them — they may be dead code.\n")
+            findings.append(
+                "These paragraphs have no PERFORMS edge pointing to them — they may be dead code.\n"
+            )
             findings.append("| Paragraph | Program |")
             findings.append("|-----------|---------|")
             for p in unreachable:
@@ -61,7 +63,9 @@ class PatternDetective:
                 called_progs.add(e.dst)
 
         if programs:
-            standalone = [p for p in programs if p.id not in called_progs and not _has_incoming_call(store, p.id)]
+            standalone = [
+                p for p in programs if p.id not in called_progs and not _has_incoming_call(store, p.id)
+            ]
             if standalone:
                 findings.append("## Standalone Programs\n")
                 findings.append("These programs are not called by any other program.\n")
@@ -76,30 +80,36 @@ class PatternDetective:
         if not findings:
             return []
 
-        content = "\n".join([
-            "---",
-            "name: pattern-detective",
-            "description: Anti-patterns and code smell findings",
-            "category: patterns",
-            "---",
-            "",
-            "# Code Pattern Analysis",
-            "",
-        ] + findings + [
-            "## Recommended Actions",
-            "",
-            "1. Investigate unreachable paragraphs — confirm they're dead before removing",
-            "2. Refactor GOTO-heavy paragraphs into structured control flow (EVALUATE/PERFORM)",
-            "3. Consider decomposing standalone programs with high complexity into subprograms",
-        ])
+        content = "\n".join(
+            [
+                "---",
+                "name: pattern-detective",
+                "description: Anti-patterns and code smell findings",
+                "category: patterns",
+                "---",
+                "",
+                "# Code Pattern Analysis",
+                "",
+            ]
+            + findings
+            + [
+                "## Recommended Actions",
+                "",
+                "1. Investigate unreachable paragraphs — confirm they're dead before removing",
+                "2. Refactor GOTO-heavy paragraphs into structured control flow (EVALUATE/PERFORM)",
+                "3. Consider decomposing standalone programs with high complexity into subprograms",
+            ]
+        )
 
-        return [SkillOutput(
-            id="pattern-detective-report",
-            title="Code Pattern Analysis",
-            category="patterns",
-            content=content,
-            related_nodes=related,
-        )]
+        return [
+            SkillOutput(
+                id="pattern-detective-report",
+                title="Code Pattern Analysis",
+                category="patterns",
+                content=content,
+                related_nodes=related,
+            )
+        ]
 
 
 def _program_for(store: GraphStore, para_id: str) -> str:
@@ -119,7 +129,4 @@ def _program_for(store: GraphStore, para_id: str) -> str:
 
 
 def _has_incoming_call(store: GraphStore, prog_id: str) -> bool:
-    for e in store.all_edges():
-        if e.type == EdgeType.CALLS and e.dst == prog_id:
-            return True
-    return False
+    return any(e.type == EdgeType.CALLS and e.dst == prog_id for e in store.all_edges())
