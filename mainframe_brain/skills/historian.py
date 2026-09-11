@@ -21,19 +21,21 @@ class RuleHistorian:
         # Group history entries by rule ID
         history: dict[str, list[dict]] = defaultdict(list)
         try:
-            if hasattr(store, '_conn'):
+            if hasattr(store, "_conn"):
                 rows = store._conn.execute(  # type: ignore[attr-defined]
-                "SELECT id, content_hash, last_verified, op, ts FROM node_history "
-                "WHERE type = ? ORDER BY ts DESC",
-                (NodeType.BUSINESS_RULE.value,)
-            ).fetchall()
+                    "SELECT id, content_hash, last_verified, op, ts FROM node_history "
+                    "WHERE type = ? ORDER BY ts DESC",
+                    (NodeType.BUSINESS_RULE.value,),
+                ).fetchall()
             for row in rows:
-                history[row["id"]].append({
-                    "content_hash": row["content_hash"],
-                    "last_verified": row["last_verified"],
-                    "op": row["op"],
-                    "ts": row["ts"],
-                })
+                history[row["id"]].append(
+                    {
+                        "content_hash": row["content_hash"],
+                        "last_verified": row["last_verified"],
+                        "op": row["op"],
+                        "ts": row["ts"],
+                    }
+                )
         except Exception:
             pass
 
@@ -90,13 +92,17 @@ class RuleHistorian:
             lines.append("These rules need human review:")
             lines.append("")
             for r in sorted(unverified, key=lambda x: x.name)[:20]:
-                lines.append(f"- [ ] `{r.name}` — verify: `mainframe-brain verify --store-path brain.db \"{r.id}\"`")
+                lines.append(
+                    f'- [ ] `{r.name}` — verify: `mainframe-brain verify --store-path brain.db "{r.id}"`'
+                )
             lines.append("")
 
-        return [SkillOutput(
-            id="rule-history",
-            title="Business Rule History",
-            category="history",
-            content="\n".join(lines),
-            related_nodes=[r.id for r in rules],
-        )]
+        return [
+            SkillOutput(
+                id="rule-history",
+                title="Business Rule History",
+                category="history",
+                content="\n".join(lines),
+                related_nodes=[r.id for r in rules],
+            )
+        ]

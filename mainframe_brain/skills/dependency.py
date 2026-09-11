@@ -104,21 +104,26 @@ class DependencyMapper:
                     lines.append(f"- {w}")
                 lines.append("")
 
-            lines.extend([
-                "## Impact Analysis Questions",
-                "",
-                f"1. If I change `{prog.name}`, what breaks? → Check **Called By** above",
-                f"2. If I change a data source, does `{prog.name}` need updates? → Check **Reads/Writes** above",
-                f"3. What's the blast radius? → {len(called_by)} upstream, {len(callees)} downstream",
-            ])
+            lines.extend(
+                [
+                    "## Impact Analysis Questions",
+                    "",
+                    f"1. If I change `{prog.name}`, what breaks? → Check **Called By** above",
+                    f"2. Does a data-source change affect `{prog.name}`? "
+                    "→ Check **Reads/Writes** above",
+                    f"3. What's the blast radius? → {len(called_by)} upstream, {len(callees)} downstream",
+                ]
+            )
 
-            outputs.append(SkillOutput(
-                id=f"dependency-{_slug(prog.name)}",
-                title=f"Dependency Map: {prog.name}",
-                category="dependency",
-                content="\n".join(lines),
-                related_nodes=[prog.id],
-            ))
+            outputs.append(
+                SkillOutput(
+                    id=f"dependency-{_slug(prog.name)}",
+                    title=f"Dependency Map: {prog.name}",
+                    category="dependency",
+                    content="\n".join(lines),
+                    related_nodes=[prog.id],
+                )
+            )
 
         return outputs
 

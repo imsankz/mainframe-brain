@@ -15,7 +15,7 @@ class TestSuggester:
     category = "tests"
 
     def analyze(self, store: GraphStore) -> list[SkillOutput]:
-        paragraphs = [n for n in store.all_nodes() if n.type == NodeType.PARAGRAPH]
+        [n for n in store.all_nodes() if n.type == NodeType.PARAGRAPH]
 
         # Find paragraphs with BusinessRule nodes linked via IMPLEMENTS_RULE
         rules: list[tuple] = []
@@ -65,7 +65,9 @@ class TestSuggester:
             lines.append(f"**Risk score:** {risk:.1f}")
             lines.append(f"**Parent paragraph:** `{para_name}`")
             lines.append(f"**Rule:** {rule_text}")
-            lines.append(f"**Verified:** {'✅ human-verified' if p.get('human_verified') else '⚠️ unverified'}")
+            lines.append(
+                f"**Verified:** {'✅ human-verified' if p.get('human_verified') else '⚠️ unverified'}"
+            )
 
             if p.get("edge_cases"):
                 lines.append("")
@@ -76,22 +78,26 @@ class TestSuggester:
             lines.append("")
             lines.append("### Suggested test scenarios")
             lines.append(f"- [ ] Happy path: normal execution of `{para_name}`")
-            lines.append(f"- [ ] Edge case: boundary conditions for date/numeric fields")
+            lines.append("- [ ] Edge case: boundary conditions for date/numeric fields")
             lines.append(f"- [ ] Error case: invalid input to `{para_name}`")
             lines.append(f"- [ ] Integration: verify `{para_name}` in the context of its calling program")
             lines.append("")
 
-        lines.extend([
-            "## AI Tool Usage",
-            "",
-            "Load this skill when tasked with writing tests for the codebase.",
-            "Each section above maps to a specific paragraph with documented business rules.",
-        ])
+        lines.extend(
+            [
+                "## AI Tool Usage",
+                "",
+                "Load this skill when tasked with writing tests for the codebase.",
+                "Each section above maps to a specific paragraph with documented business rules.",
+            ]
+        )
 
-        return [SkillOutput(
-            id="test-suggestions",
-            title="Test Case Suggestions",
-            category="tests",
-            content="\n".join(lines),
-            related_nodes=[r.id for r, _ in top],
-        )]
+        return [
+            SkillOutput(
+                id="test-suggestions",
+                title="Test Case Suggestions",
+                category="tests",
+                content="\n".join(lines),
+                related_nodes=[r.id for r, _ in top],
+            )
+        ]
