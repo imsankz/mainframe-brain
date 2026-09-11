@@ -27,7 +27,7 @@ python3 -m ruff check --fix mainframe_brain tests --config pyproject.toml
 python3 -m pytest tests/ -q
 ```
 
-Currently 28 tests (unit + golden). Must stay green. Run a single file:
+Currently 73 tests (unit + golden + integration). Must stay green. Run a single file:
 ```bash
 python3 -m pytest tests/unit/test_*.py -q
 python3 -m pytest tests/golden/test_*_golden.py -q

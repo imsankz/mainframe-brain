@@ -30,9 +30,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/imsankz/mainframe-brain"
+Homepage = "https://imsankz.github.io/mainframe-brain/"
 Issues = "https://github.com/imsankz/mainframe-brain/issues"
-Changelog = "https://github.com/imsankz/mainframe-brain/blob/main/CHANGELOG.md"
+Changelog = "https://github.com/imsankz/mainframe-brain/blob/master/CHANGELOG.md"
 Source = "https://github.com/imsankz/mainframe-brain"
 
 [project.optional-dependencies]
